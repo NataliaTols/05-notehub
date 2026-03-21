@@ -1,0 +1,69 @@
+import css from "./App.module.css";
+import { useState } from "react";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useDebouncedCallback } from "use-debounce";
+import { fetchNotes } from "../../services/noteService";
+import NoteList from "../NoteList/NoteList";
+import SearchBox from "../SearchBox/SearchBox";
+import Pagination from "../Pagination/Pagination";
+import Modal from "../Modal/Modal";
+import NoteForm from "../NoteForm/NoteForm";
+import Loader from "../Loader/Loader";
+export default function App() {
+  const [query, setQuery] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage] = useState(12);
+  const [isClicked, setIsClicked] = useState(false);
+  const { data, isError, isLoading } = useQuery({
+    queryKey: ["notes", query, currentPage],
+    queryFn: () => fetchNotes(query, currentPage, perPage),
+    placeholderData: keepPreviousData,
+  });
+  const updateSearch = useDebouncedCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setQuery(event.target.value);
+      setSearchText(event.target.value);
+      setCurrentPage(1);
+    },
+    1000,
+  );
+
+  const totalPages = data?.totalPages ?? 0;
+
+  function handleChangePage(newPage: number) {
+    setCurrentPage(newPage);
+  }
+
+  function handelCloseModal() {
+    setIsClicked(false);
+  }
+
+  return (
+    <div className={css.app}>
+      <header className={css.toolbar}>
+        <SearchBox searchText={searchText} updateSearch={updateSearch} />
+        {totalPages > 1 && (
+          <Pagination
+            pageCount={data?.totalPages ?? 0}
+            currentPage={currentPage}
+            onPageChange={handleChangePage}
+          />
+        )}
+        <button className={css.button} onClick={() => setIsClicked(true)}>
+          Create note +
+        </button>
+      </header>
+
+      {isLoading && <Loader />}
+      {data && data.notes.length > 0 && !isError && (
+        <NoteList notes={data?.notes ?? []} />
+      )}
+      {isClicked && (
+        <Modal onClose={handelCloseModal}>
+          <NoteForm onClose={handelCloseModal} />
+        </Modal>
+      )}
+    </div>
+  );
+}
